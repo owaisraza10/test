@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud C2 — Remote OS Quarantine Manager</title>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, sans-serif; }
+    body { margin: 0; background: #07090e; color: #f8fafc; padding: 20px; }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { color: #ef4444; font-size: 22px; margin-bottom: 4px; }
+    p { color: #94a3b8; font-size: 13px; margin-bottom: 20px; }
+    .config-box { background: #111827; padding: 16px; border-radius: 10px; border: 1px solid #1f2937; margin-bottom: 20px; }
+    input[type="text"] { width: 100%; padding: 10px; background: #030712; border: 1px solid #374151; color: #fff; border-radius: 6px; font-family: monospace; font-size: 13px; margin-top: 6px; }
+    table { width: 100%; border-collapse: collapse; background: #111827; border-radius: 10px; overflow: hidden; border: 1px solid #1f2937; }
+    th, td { padding: 14px; text-align: left; border-bottom: 1px solid #1f2937; font-size: 13px; }
+    th { background: #1f2937; color: #cbd5e1; text-transform: uppercase; font-size: 11px; }
+    .badge-active { background: rgba(239, 68, 68, 0.2); color: #f87171; padding: 4px 8px; border-radius: 999px; font-weight: 600; font-size: 11px; }
+    .badge-disarmed { background: rgba(34, 197, 94, 0.2); color: #4ade80; padding: 4px 8px; border-radius: 999px; font-weight: 600; font-size: 11px; }
+    .btn-lift { background: #dc2626; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px; }
+    .btn-lift:hover { background: #b91c1c; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>☁️ CLOUD C2 COMMAND CENTER</h1>
+    <p>Manage OS Quarantine & Remote Unlocks from your phone or any cloud device.</p>
+
+    <div class="config-box">
+      <label style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Render C2 Server URL:</label>
+      <input type="text" id="daemonUrl" placeholder="https://your-c2-backend.onrender.com" value="" onchange="saveUrl()" />
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Session ID</th>
+          <th>Reason</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="sessionTable">
+        <tr><td colspan="4" style="text-align: center; color: #64748b;">Enter your Render C2 URL above to connect...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    function getBaseUrl() {
+      return document.getElementById("daemonUrl").value.trim().replace(/\/$/, "");
+    }
+
+    function saveUrl() {
+      localStorage.setItem("c2_server_url", document.getElementById("daemonUrl").value);
+      fetchSessions();
+    }
+
+    window.onload = () => {
+      const saved = localStorage.getItem("c2_server_url") || localStorage.getItem("c2_daemon_url");
+      if (saved) {
+        document.getElementById("daemonUrl").value = saved;
+        fetchSessions();
+        setInterval(fetchSessions, 2000);
+      }
+    };
+
+    async function fetchSessions() {
+      const baseUrl = getBaseUrl();
+      if (!baseUrl) return;
+
+      try {
+        const res = await fetch(`${baseUrl}/api/sessions`);
+        const sessions = await res.json();
+        const tbody = document.getElementById("sessionTable");
+
+        if (sessions.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b;">No active lockdowns recorded.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = sessions.map(s => `
+          <tr>
+            <td style="font-family: monospace; font-weight: bold; color: #60a5fa;">${s.session_id}</td>
+            <td>${s.reason}</td>
+            <td><span class="${s.status === 'ACTIVE' ? 'badge-active' : 'badge-disarmed'}">${s.status}</span></td>
+            <td>
+              ${s.status === 'ACTIVE' 
+                ? `<button class="btn-lift" onclick="liftQuarantine('${s.session_id}')">Lift Quarantine</button>` 
+                : `<span style="color: #64748b; font-size: 12px;">Resolved</span>`}
+            </td>
+          </tr>
+        `).join("");
+      } catch (err) {
+        console.error("Cloud C2 connection failed", err);
+      }
+    }
+
+    async function liftQuarantine(sessionId) {
+      const baseUrl = getBaseUrl();
+      if (!baseUrl) return alert("Please enter the Render C2 URL first.");
+      if (!confirm(`Remotely lift quarantine for ${sessionId}?`)) return;
+
+      try {
+        await fetch(`${baseUrl}/api/lift-quarantine?session_id=${sessionId}`);
+        fetchSessions();
+      } catch (err) {
+        alert("Failed to reach cloud C2 server.");
+      }
+    }
+  </script>
+</body>
+</html>
