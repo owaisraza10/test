@@ -10,12 +10,8 @@
     .container { max-width: 800px; margin: 0 auto; }
     h1 { color: #ef4444; font-size: 22px; margin-bottom: 4px; }
     p { color: #94a3b8; font-size: 13px; margin-bottom: 20px; }
-    .status-banner { 
-      background: #111827; padding: 14px 16px; border-radius: 10px; 
-      border: 1px solid #1f2937; margin-bottom: 20px; font-size: 13px; 
-      color: #60a5fa; font-family: monospace; display: flex; align-items: center; justify-content: space-between;
-    }
-    .status-dot { height: 10px; width: 10px; background-color: #22c55e; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #22c55e; margin-right: 8px;}
+    .config-box { background: #111827; padding: 16px; border-radius: 10px; border: 1px solid #1f2937; margin-bottom: 20px; }
+    input[type="text"] { width: 100%; padding: 10px; background: #030712; border: 1px solid #374151; color: #4ade80; border-radius: 6px; font-family: monospace; font-size: 13px; margin-top: 6px; }
     table { width: 100%; border-collapse: collapse; background: #111827; border-radius: 10px; overflow: hidden; border: 1px solid #1f2937; }
     th, td { padding: 14px; text-align: left; border-bottom: 1px solid #1f2937; font-size: 13px; }
     th { background: #1f2937; color: #cbd5e1; text-transform: uppercase; font-size: 11px; }
@@ -28,11 +24,11 @@
 <body>
   <div class="container">
     <h1>☁️ CLOUD C2 COMMAND CENTER</h1>
-    <p>Live Telemetry & Remote Quarantine Management</p>
+    <p>Manage OS Quarantine & Remote Unlocks from your phone or any cloud device.</p>
 
-    <div class="status-banner">
-      <div><span class="status-dot"></span> Tunnel Target: <strong>https://test-uukm.onrender.com/</strong></div>
-      <div id="connStatus" style="font-size: 11px; color: #94a3b8;">Polling active...</div>
+    <div class="config-box">
+      <label style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Render C2 Server (Hardcoded & Connected):</label>
+      <input type="text" id="daemonUrl" value="https://test-uukm.onrender.com" readonly />
     </div>
 
     <table>
@@ -45,30 +41,33 @@
         </tr>
       </thead>
       <tbody id="sessionTable">
-        <tr><td colspan="4" style="text-align: center; color: #64748b;">Connecting to cloud daemon...</td></tr>
+        <tr><td colspan="4" style="text-align: center; color: #64748b;">Connecting to Render cloud server...</td></tr>
       </tbody>
     </table>
   </div>
 
   <script>
-    const BASE_URL = "https://perennial-uneasy-hypnotic.ngrok-free.dev";
+    const RENDER_URL = "https://test-uukm.onrender.com";
+
+    function getBaseUrl() {
+      return RENDER_URL.replace(/\/$/, "");
+    }
+
+    window.onload = () => {
+      fetchSessions();
+      setInterval(fetchSessions, 2000); // Auto-refresh telemetry every 2 seconds
+    };
 
     async function fetchSessions() {
-      const statusIndicator = document.getElementById("connStatus");
+      const baseUrl = getBaseUrl();
+
       try {
-        const res = await fetch(`${BASE_URL}/api/sessions`, {
-          headers: {
-            "ngrok-skip-browser-warning": "true"
-          }
-        });
+        const res = await fetch(`${baseUrl}/api/sessions`);
         const sessions = await res.json();
         const tbody = document.getElementById("sessionTable");
-        
-        statusIndicator.innerText = "Connected (Syncing)";
-        statusIndicator.style.color = "#4ade80";
 
         if (sessions.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b;">No active lockdowns recorded.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b;">No active lockdowns recorded. System secure.</td></tr>`;
           return;
         }
 
@@ -85,30 +84,22 @@
           </tr>
         `).join("");
       } catch (err) {
-        statusIndicator.innerText = "Connection Failed (Check Python/Ngrok)";
-        statusIndicator.style.color = "#f87171";
         console.error("Cloud C2 connection failed", err);
+        document.getElementById("sessionTable").innerHTML = `<tr><td colspan="4" style="text-align: center; color: #ef4444;">Connecting to Render backend... (Spinning up server)</td></tr>`;
       }
     }
 
     async function liftQuarantine(sessionId) {
+      const baseUrl = getBaseUrl();
       if (!confirm(`Remotely lift quarantine for ${sessionId}?`)) return;
 
       try {
-        await fetch(`${BASE_URL}/api/lift-quarantine?session_id=${sessionId}`, {
-          headers: {
-            "ngrok-skip-browser-warning": "true"
-          }
-        });
+        await fetch(`${baseUrl}/api/lift-quarantine?session_id=${sessionId}`);
         fetchSessions();
       } catch (err) {
-        alert("Failed to reach cloud daemon.");
+        alert("Failed to reach cloud C2 server.");
       }
     }
-
-    // Auto-poll every 2 seconds
-    fetchSessions();
-    setInterval(fetchSessions, 2000);
   </script>
 </body>
 </html>
