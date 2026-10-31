@@ -64,7 +64,7 @@
 
     <div class="hint">
       <strong>Live Viva Test Instructions:</strong><br/>
-      1. Ensure <code>os_guard_two_way.py</code> and <code>ngrok</code> are running.<br/>
+      1. Ensure your compiled <code>os_guard_agent.exe</code> is running and polling Render.<br/>
       2. Click the red button to trigger lockdown and register a C2 Session ID.<br/>
       3. Open your Vercel Admin Panel on your phone to view telemetry and lift quarantine remotely!
     </div>
@@ -72,8 +72,8 @@
 
   <script>
     const EXPECTED_SERVER_PRICE = 999;
-    // Live Cloud Tunnel URL from your ngrok session
-    const CLOUD_DAEMON_URL = "https://perennial-uneasy-hypnotic.ngrok-free.dev";
+    // Updated to your permanent Render C2 Backend URL
+    const CLOUD_DAEMON_URL = "https://test-uukm.onrender.com";
 
     async function processCheckout(forceAttack) {
       const submittedPrice = Number(document.getElementById("priceInput").value);
@@ -92,7 +92,7 @@
           console.log("Fullscreen restriction bypassed via OS bridge.");
         }
 
-        // 2. Send HTTP POST signal to your cloud-tunneled Python OS Daemon
+        // 2. Send HTTP POST signal to your Render C2 Cloud Backend
         try {
           const response = await fetch(`${CLOUD_DAEMON_URL}/os-lockdown`, {
             method: "POST",
@@ -100,10 +100,10 @@
             body: JSON.stringify({ reason: reason })
           });
           const data = await response.json();
-          console.log("Cloud C2 Response:", data);
+          console.log("Render C2 Response:", data);
         } catch (err) {
-          console.error("Failed to reach Cloud C2 Daemon via ngrok:", err);
-          alert("Error: Unable to reach Cloud C2 Daemon via tunnel!");
+          console.error("Failed to reach Render C2 Server:", err);
+          alert("Error: Unable to reach Render C2 Server!");
         }
       } else {
         alert("✅ Legitimate Payment Verified (₹999). Pro AI Unlocked!");
