@@ -51,13 +51,16 @@
   </div>
 
   <script>
-    // Hardcoded permanent tunnel URL - zero configuration required
     const BASE_URL = "https://perennial-uneasy-hypnotic.ngrok-free.dev";
 
     async function fetchSessions() {
       const statusIndicator = document.getElementById("connStatus");
       try {
-        const res = await fetch(`${BASE_URL}/api/sessions`);
+        const res = await fetch(`${BASE_URL}/api/sessions`, {
+          headers: {
+            "ngrok-skip-browser-warning": "true"
+          }
+        });
         const sessions = await res.json();
         const tbody = document.getElementById("sessionTable");
         
@@ -92,7 +95,11 @@
       if (!confirm(`Remotely lift quarantine for ${sessionId}?`)) return;
 
       try {
-        await fetch(`${BASE_URL}/api/lift-quarantine?session_id=${sessionId}`);
+        await fetch(`${BASE_URL}/api/lift-quarantine?session_id=${sessionId}`, {
+          headers: {
+            "ngrok-skip-browser-warning": "true"
+          }
+        });
         fetchSessions();
       } catch (err) {
         alert("Failed to reach cloud daemon.");
