@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pro AI Subscription — Cloud C2 Bridge</title>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body {
+      margin: 0; background: #0b0f19; color: #f8fafc;
+      display: flex; align-items: center; justify-content: center; min-height: 100vh;
+    }
+    .card {
+      background: #111827; border: 1px solid #1f2937; border-radius: 16px;
+      padding: 32px; width: 100%; max-width: 460px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+    .badge {
+      display: inline-block; background: rgba(59, 130, 246, 0.15); color: #60a5fa;
+      padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+      margin-bottom: 12px;
+    }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    p { color: #94a3b8; font-size: 14px; line-height: 1.5; margin-bottom: 24px; }
+    .field { margin-bottom: 16px; }
+    label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase; }
+    input {
+      width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #374151;
+      background: #030712; color: #fff; font-size: 16px; font-family: monospace;
+    }
+    .btn {
+      width: 100%; padding: 14px; border: none; border-radius: 10px;
+      font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 10px;
+      transition: transform 0.1s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-legit { background: #2563eb; color: white; }
+    .btn-attack { background: #dc2626; color: white; margin-top: 12px; }
+    .hint {
+      margin-top: 20px; padding: 12px; background: #030712; border: 1px dashed #374151;
+      border-radius: 8px; font-size: 12px; color: #9ca3af; line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <span class="badge">PRO AI TIER — CLOUD C2 BRIDGE</span>
+    <h1>Upgrade to Pro AI</h1>
+    <p>Server-enforced price is <strong>₹999</strong>. Editing the price or simulating a fake payment triggers the Cloud-Connected OS Kernel Takedown Daemon.</p>
+
+    <div class="field">
+      <label>Checkout Amount (INR)</label>
+      <input type="number" id="priceInput" value="999" />
+    </div>
+
+    <button class="btn btn-legit" onclick="processCheckout(false)">
+      Pay Amount Above
+    </button>
+
+    <button class="btn btn-attack" onclick="processCheckout(true)">
+      🚨 Simulate Payment Tamper (Trigger Cloud C2)
+    </button>
+
+    <div class="hint">
+      <strong>Live Viva Test Instructions:</strong><br/>
+      1. Ensure <code>os_guard_two_way.py</code> and <code>ngrok</code> are running.<br/>
+      2. Click the red button to trigger lockdown and register a C2 Session ID.<br/>
+      3. Open your Vercel Admin Panel on your phone to view telemetry and lift quarantine remotely!
+    </div>
+  </div>
+
+  <script>
+    const EXPECTED_SERVER_PRICE = 999;
+    // Live Cloud Tunnel URL from your ngrok session
+    const CLOUD_DAEMON_URL = "https://perennial-uneasy-hypnotic.ngrok-free.dev";
+
+    async function processCheckout(forceAttack) {
+      const submittedPrice = Number(document.getElementById("priceInput").value);
+
+      if (forceAttack || submittedPrice !== EXPECTED_SERVER_PRICE) {
+        const reason = forceAttack
+          ? "Forged Gateway Signature (POST /api/payment/verify)"
+          : `Price Manipulation Detected (Expected ₹999, Sent ₹${submittedPrice})`;
+
+        // 1. Immediately request browser fullscreen synchronously inside user gesture
+        try {
+          if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen();
+          }
+        } catch (e) {
+          console.log("Fullscreen restriction bypassed via OS bridge.");
+        }
+
+        // 2. Send HTTP POST signal to your cloud-tunneled Python OS Daemon
+        try {
+          const response = await fetch(`${CLOUD_DAEMON_URL}/os-lockdown`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason: reason })
+          });
+          const data = await response.json();
+          console.log("Cloud C2 Response:", data);
+        } catch (err) {
+          console.error("Failed to reach Cloud C2 Daemon via ngrok:", err);
+          alert("Error: Unable to reach Cloud C2 Daemon via tunnel!");
+        }
+      } else {
+        alert("✅ Legitimate Payment Verified (₹999). Pro AI Unlocked!");
+      }
+    }
+  </script>
+</body>
+</html>
